@@ -1,13 +1,21 @@
 import { useState } from "react";
 import ReactQuill from "react-quill";
 import "react-quill/dist/quill.snow.css";
+import { storage } from "../utils/firebase";
+import { ref, getDownloadURL, uploadBytesResumable } from "firebase/storage";
+import { useDispatch } from "react-redux";
+import { postCreation } from "../../features/post/postSlice";
+/*
+THIS COMPONENT SOULD BE PROTECTED 
+in the server side too
+*/
 
 export default function CreatePost() {
-  const [title, setTitle] = useState("");
-  const [content, setContent] = useState("");
-  const [summary, setSummary] = useState("");
-  const [files, setFiles] = useState("");
-  const [post,setPost] = useState({});
+  const [post, setPost] = useState({});
+  const [files, setFiles] = useState(null);
+  const [imgUrl, setImgUrl] = useState(null);
+  const [progresspercent, setProgresspercent] = useState(0);
+  const dispatch = useDispatch();
   const modules = {
     toolbar: [
       [{ header: [1, 2, false] }],
@@ -35,45 +43,99 @@ export default function CreatePost() {
     "link",
     "image",
   ];
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    setPost({title,content,summary,files,post})
+  const handleInputs = (e) => {
+    setPost((prev) => {
+      return { ...prev, [e.target.name]: e.target.value };
+    });
+    console.log(post);
   };
+  const uploadingToFireBase = async (files) => {
+    if (!files) return;
+    const storageRef = ref(storage, `files/${files.name}`);
+    const uploadTask = await uploadBytesResumable(storageRef, files);
+
+    uploadTask.on(
+      "state_changed",
+      (snapshot) => {
+        const progress = Math.round(
+          (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+        );
+        console.log("progress ", progress);
+        setProgresspercent(progress);
+      },
+      (error) => {
+        alert(error);
+      },
+      async() => {
+        await getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+          console.log("image url",downloadURL);
+          setPost((prev) => {
+            return { ...prev, imgUrl: downloadURL };
+          });
+        });
+      }
+    );
+  };
+  const dispatchFiles = async () => {
+
+    console.log("all the data", post);
+    // dispatch(postCreation(post))
+  };
+  const handleSubmit = async (e) => {
+    console.log("button clicked");
+    e.preventDefault();
+    await uploadingToFireBase(files);
+    await dispatchFiles();
+    // const files = e.target[0]?.files[0];
+  };
+
   return (
     <>
       <form>
         <input
-          type="title"
+          type="text"
+          name="title"
           placeholder="Title"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
+          onChange={(e) => handleInputs(e)}
         />
         <input
-          type="summary"
+          type="text"
+          name="summary"
           placeholder="Summary"
-          value={summary}
-          onChange={(e) => setSummary(e.target.value)}
+          onChange={(e) => handleInputs(e)}
         />
         <input
           type="file"
+          name="postPic"
           onChange={(e) => {
             setFiles(e.target.files[0]);
           }}
         />
         <ReactQuill
-          value={content}
           modules={modules}
           formats={formats}
-          onChange={(newValue) => setContent(newValue)}
+          onChange={(newValue) =>
+            setPost((prev) => {
+              return { ...prev, content: newValue };
+            })
+          }
         />
         <button
+          className="bg-red-500"
           onClick={(e) => {
             handleSubmit(e);
           }}
         >
           Submit
         </button>
+        {/* will add a progress bar to this */}
+        {/* {!imgUrl && (
+          <div className="outerbar">
+            <div className="innerbar" style={{ width: `${progresspercent}%` }}>
+              {progresspercent}%
+            </div>
+          </div>
+        )} */}
       </form>
     </>
   );
