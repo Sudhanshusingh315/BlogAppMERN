@@ -11,6 +11,7 @@ in the server side too
 */
 
 export default function CreatePost() {
+  const [done, setDone] = useState(false);
   const [post, setPost] = useState({});
   const [files, setFiles] = useState(null);
   const [imgUrl, setImgUrl] = useState(null);
@@ -51,44 +52,50 @@ export default function CreatePost() {
   };
   const uploadingToFireBase = async (files) => {
     if (!files) return;
-    const storageRef = ref(storage, `files/${files.name}`);
-    const uploadTask = await uploadBytesResumable(storageRef, files);
+    // const storageRef = ref(storage, `files/${files.name}`);
+    // const uploadTask = uploadBytesResumable(storageRef, files);
 
-    uploadTask.on(
-      "state_changed",
-      (snapshot) => {
-        const progress = Math.round(
-          (snapshot.bytesTransferred / snapshot.totalBytes) * 100
-        );
-        console.log("progress ", progress);
-        setProgresspercent(progress);
-      },
-      (error) => {
-        alert(error);
-      },
-      async() => {
-        await getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
-          console.log("image url",downloadURL);
-          setPost((prev) => {
-            return { ...prev, imgUrl: downloadURL };
-          });
-        });
+    // uploadTask.on(
+    //   "state_changed",
+    //   (snapshot) => {
+    //     const progress = Math.round(
+    //       (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+    //     );
+    //     console.log("progress ", progress);
+    //     setProgresspercent(progress);
+    //   },
+    //   (error) => {
+    //     alert(error);
+    //   },
+    //   async() => {
+    //     await getDownloadURL(uploadTask.snapshot.ref).then((downloadURL) => {
+    //       console.log("image url",downloadURL);
+    //       setPost((prev) => {
+    //         return { ...prev, imgUrl: downloadURL };
+    //       });
+    //     });
+    //   }
+    // );await
+    const storageRef = ref(storage, `/images/${files.name}`);
+    const response = await uploadBytesResumable(storageRef, files);
+    const url = await getDownloadURL(response.ref);
+    setPost((prev) => {
+      {
+        return { ...prev, imgUrl: url };
       }
-    );
+    });
+    setDone(true);
   };
-  const dispatchFiles = async () => {
-
-    console.log("all the data", post);
-    // dispatch(postCreation(post))
+  const dispatchFiles = async (e) => {
+    e.preventDefault();
+    console.log("all the data in the dispatch funtion", post);
+    dispatch(postCreation(post))
   };
   const handleSubmit = async (e) => {
     console.log("button clicked");
     e.preventDefault();
-    await uploadingToFireBase(files);
-    await dispatchFiles();
-    // const files = e.target[0]?.files[0];
+    uploadingToFireBase(files);
   };
-
   return (
     <>
       <form>
@@ -120,14 +127,30 @@ export default function CreatePost() {
             })
           }
         />
-        <button
-          className="bg-red-500"
-          onClick={(e) => {
-            handleSubmit(e);
-          }}
-        >
-          Submit
-        </button>
+        {done ? (
+          <>
+            <button
+              className="bg-red-500"
+              onClick={(e) => {
+                dispatchFiles(e);
+              }}
+            >
+              Upload
+            </button>
+            
+          </>
+        ) : (
+          <>
+            <button
+              className="bg-red-500"
+              onClick={(e) => {
+                handleSubmit(e);
+              }}
+            >
+              Submit
+            </button>
+          </>
+        )}
         {/* will add a progress bar to this */}
         {/* {!imgUrl && (
           <div className="outerbar">
